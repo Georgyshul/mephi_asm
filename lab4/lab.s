@@ -86,7 +86,6 @@ main:
 		leave
 		ret
 
-
 scan_x:
 	push    rbp
 	mov	rbp, rsp
@@ -185,8 +184,6 @@ calc_accuracy:
 	movsd	xmm1, [accuracy]
 	leave
 	ret
-
-	
 	
 lib:
 	push	rbp
