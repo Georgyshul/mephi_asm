@@ -1,6 +1,9 @@
 bits 64
 
 ; implementation of asin(x) from math.h
+
+; execution:	./lab <filename>
+
 ; data type -- double
 ; in argv should be passed logfile name
 ; output: 	--math.h result::stdout
@@ -9,7 +12,6 @@ bits 64
 section .data
 	msg_scan_x	db "input x: ", 0
 	msg_scan_n	db "input n: ", 0
-	msg_test	db "test", 0
 
 	specifier_double	db "%lf", 0
 	specifier_int		db "%d", 0
@@ -17,7 +19,7 @@ section .data
 	msg_res_library	db "Library result: %20.15lf", 0x0a, 0
 	msg_res_custom	db "Custom result:  %20.15lf", 0x0a, 0
 
-	log_into_file	db "%.15lf", 0x0a, 0
+	log_into_file	db "%-10d %.15lf", 0x0a, 0
  
 	x		dq 0
 	n		dq 0
@@ -104,9 +106,10 @@ scan_x:
 	call	scanf
 	
 	movsd	xmm0, [x]
-	xor	rax, rax
-    	leave
-    	ret
+	.ret:
+		mov	eax, 0
+    		leave
+    		ret
 
 check_x:
 	push		rbp
@@ -155,8 +158,9 @@ scan_n:
 	call	scanf
 	
 	mov	rax, [n]
-    	leave
-    	ret
+	.ret:
+    		leave
+    		ret
 
 calc_accuracy:
 	push		rbp
@@ -174,7 +178,6 @@ calc_accuracy:
 	.loop:
 		divsd	xmm0, xmm1
 		inc	rcx
-
 		.check:
 			cmp	rcx, [n]
 			jl	.loop
@@ -182,9 +185,10 @@ calc_accuracy:
 	mov	rax, accuracy
 	movsd	[rax + 0], xmm0
 	movsd	xmm1, [accuracy]
-	leave
-	ret
-	
+	.ret:
+		leave
+		ret
+
 lib:
 	push	rbp
 	mov	rbp, rsp
@@ -195,9 +199,9 @@ lib:
 	
 	mov	rax, res_lib
 	movsd	[rax + 0], xmm0
-	;movq	xmm0, rax
-	leave
-	ret
+	.ret:
+		leave
+		ret
 
 my_asin:
 	push 	rbp
@@ -215,67 +219,66 @@ my_asin:
 	cvtsi2sd	xmm10, rax
 	mov		rcx, 0		; loop index
 
-	lea		rax, filename
-	;mov 		rdi, rax
-	mov		rdi, filename
-	xor		rax, rax
-	mov		rsi, file_open_mode
-	call 		fopen
+	.open_file:
+		lea	rax, filename
+		mov	rdi, filename
+		xor	rax, rax
+		mov	rsi, file_open_mode
+		call	fopen
 
-	mov		rdi, rax
-	mov		r13, rdi
+		mov	rdi, rax
+		mov	r13, rdi 	; file descriptor in r13
 
-	;mov		rdi, rax
-	;mov		rsi, log_into_file
-	;movsd		xmm0, xmm8
-	;mov		eax, 1
-	;call		fprintf
 	.loop:
-		; make log
-		push		rcx
-		mov		rdi, r13
-		;mov		rsi, msg_test
-		mov		rsi, log_into_file
-		movsd		xmm0, xmm8
-		mov		eax, 1
-		call		fprintf
-		pop		rcx
-
 		addsd		xmm10, xmm8	; sum += element
 
-		mulsd		xmm8, xmm9	; *x^2
+		.make_log:
+			push		rcx
+			mov		rdi, r13
+			mov		rdx, rcx
+			sub		rsp, 8
+			movsd		qword[rsp], xmm8
+			mov		rsi, log_into_file
+			movsd		xmm0, xmm8
+			mov		eax, 1
+			call		fprintf
+			add		rsp, 8
+			pop		rcx
+
+		.calc_next_element:
+			mulsd		xmm8, xmm9	; *x^2
 		
-		mov		rax, 4
-		pxor		xmm3, xmm3
-		cvtsi2sd	xmm3, rax
-		divsd		xmm8, xmm3	; / 4
+			mov		rax, 4
+			pxor		xmm3, xmm3
+			cvtsi2sd	xmm3, rax
+			divsd		xmm8, xmm3	; / 4
 
-		pxor		xmm3, xmm3
-		cvtsi2sd	xmm3, rcx	; xmm3 = n		
+			pxor		xmm3, xmm3
+			cvtsi2sd	xmm3, rcx	; xmm3 = n		
+	
+			movsd		xmm4, xmm3
+			mov 		rax, 2
+			cvtsi2sd	xmm5, rax
+			mulsd		xmm4, xmm5	; xmm4 = 2n
 
-		movsd		xmm4, xmm3
-		mov 		rax, 2
-		cvtsi2sd	xmm5, rax
-		mulsd		xmm4, xmm5	; xmm4 = 2n
+			mov		rax, 1
+			cvtsi2sd	xmm5, rax
+			addsd		xmm3, xmm5	; xmm3 = n + 1
 
-		mov		rax, 1
-		cvtsi2sd	xmm5, rax
-		addsd		xmm3, xmm5	; xmm3 = n + 1
+			divsd		xmm8, xmm3	; / (n+1)
+			divsd		xmm8, xmm3	; / (n+1)
 
-		divsd		xmm8, xmm3	; / (n+1)
-		divsd		xmm8, xmm3	; / (n+1)
-
-		addsd		xmm4, xmm5	; xmm4 = 2n+1
-		mulsd		xmm8, xmm4	; *(2n+1)
-		mulsd		xmm8, xmm4	; *(2n+1)
+			addsd		xmm4, xmm5	; xmm4 = 2n+1
+			mulsd		xmm8, xmm4	; *(2n+1)
+			mulsd		xmm8, xmm4	; *(2n+1)
 		
-		addsd		xmm4, xmm5	; xmm4 = 2n+2
-		mulsd		xmm8, xmm4	; *(2n+2)
+			addsd		xmm4, xmm5	; xmm4 = 2n+2
+			mulsd		xmm8, xmm4	; *(2n+2)
 
-		addsd		xmm4, xmm5	; xmm4 = 2n+3
-		divsd		xmm8, xmm4	; /(2n+3)
+			addsd		xmm4, xmm5	; xmm4 = 2n+3
+			divsd		xmm8, xmm4	; /(2n+3)
 
-		inc		rcx
+			inc		rcx
 		.check:
 			mov		rax, 0
 			cvtsi2sd	xmm3, rax
@@ -293,10 +296,11 @@ my_asin:
 	movsd	xmm8, xmm10
 	mov	rax, res_cus
 	movsd	[rax + 0], xmm8
-	;mov	rdi, [rbp - 0x10]
+
 	mov	rdi, r13
 	mov	rax, 1
 	call	fclose
-
-	leave
-	ret
+	
+	.ret:
+		leave
+		ret
